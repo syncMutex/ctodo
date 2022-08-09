@@ -35,6 +35,9 @@ PAD main_pad;
 #define tline_count(tidx) ((todos[tidx].todo.length + 3) / main_pad.max.x + 1)
 #define pad_clear(p) wclear(p.pad)
 #define tlnc_wlnbr(tidx) (tline_count(tidx) + 1)
+#define no_change cur_tidx
+#define update_todo_curs(pos, do_paint) _update_todo_curs(pos, do_paint, is_move_mode)
+#define cur_tidx todo_cursor.cur_todo_idx
 
 string get_new_input(char* placeholder) {
   PAD input_pad = new_subpad(main_pad, -1, -1, 3, 1);
@@ -167,10 +170,8 @@ void render_todos() {
 int get_offset(int todo_idx) {
   int sum = 0;
 
-  for(int i = 0; i < todo_idx; i++) {
-    int tlen = todos[i].todo.length;
-    sum += 1 + (tlen / main_pad.max.x);
-  }
+  for(int i = 0; i < todo_idx; i++)
+    sum += tlnc_wlnbr(i);
   
   return sum;
 }
@@ -191,14 +192,14 @@ void adjust_scr_bounds(int cur_end_offset) {
   }
 }
 
-void update_todo_curs(int prevtidx, bool do_paint) {
+void _update_todo_curs(int prevtidx, bool do_paint, bool is_move_mode) {
   if(todos == NULL) return;
-  int curtidx = todo_cursor.cur_todo_idx;
+  int curtidx = cur_tidx;
 
   todo prev_todo = todos[prevtidx];
   todo to_hilgt_todo = todos[curtidx];
 
-  enum todo_colors ch = COLOR_PAIR(COLOR_HIGHLIGHT);
+  enum todo_colors ch = COLOR_PAIR(is_move_mode ? COLOR_MOVE_MODE : COLOR_HIGHLIGHT);
 
   if(prevtidx != curtidx) {
     if(prevtidx < todo_count)
@@ -230,6 +231,19 @@ void check_pad_space_add_todo(todo* new_todo) {
   if(todo_cursor.max_offset >= main_pad.dimen.y) {
     main_pad.dimen.y = todo_cursor.max_offset;
     wresize(main_pad.pad, main_pad.dimen.y, main_pad.dimen.x);
+  }
+}
+
+void swap_todos(int idx1, int idx2) {
+  todo temp = todos[idx1];
+  todos[idx1] = todos[idx2];
+  todos[idx2] = temp;
+}
+
+void clrnln_from(int from, int n) {
+  for(int i = 0; i < n; i++, from++) {
+    wmove(main_pad.pad, from, 0);
+    wclrtoeol(main_pad.pad);
   }
 }
 
@@ -277,10 +291,13 @@ int main() {
   todo_cursor.screen_bounds.upr = main_pad.offset.y;
   // because getmaxyx gives line count and not max idx
   todo_cursor.screen_bounds.lwr = main_pad.max.y - 1 - main_pad.offset.y;
-  update_todo_curs(0, true);
 
   bool quit = false;
+  bool is_move_mode = false;
   int prev_c;
+
+  update_todo_curs(0, true);
+
   while(!quit) {
     int c = getch();
 
@@ -292,36 +309,49 @@ int main() {
       todo* new_todo = get_new_todo_input();
       check_pad_space_add_todo(new_todo);
       render_todos();
-      while(todo_cursor.cur_todo_idx != todo_count - 2)
-        update_todo_curs(todo_cursor.cur_todo_idx++, false);
+      while(cur_tidx != todo_count - 2)
+        update_todo_curs(cur_tidx++, false);
 
-      update_todo_curs(todo_cursor.cur_todo_idx++, true);
+      update_todo_curs(cur_tidx++, true);
       break;
     case KEY_DOWN:
     case 'j':
-      if(todo_cursor.cur_todo_idx >= todo_count - 1) break;
-      update_todo_curs(todo_cursor.cur_todo_idx++, true);
+      if(cur_tidx >= todo_count - 1) break;
+      if(is_move_mode) {
+        swap_todos(cur_tidx, cur_tidx + 1);
+        clrnln_from(todo_cursor.offset, tlnc_wlnbr(cur_tidx) + tlnc_wlnbr(cur_tidx + 1));
+      }
+      update_todo_curs(cur_tidx++, true);
       break;
     case KEY_UP:
     case 'k':
-      if(todo_cursor.cur_todo_idx <= 0) break;
-      update_todo_curs(todo_cursor.cur_todo_idx--, true);
+      if(cur_tidx <= 0) break;
+      if(is_move_mode) {
+        clrnln_from(todo_cursor.offset - tlnc_wlnbr(cur_tidx - 1), tlnc_wlnbr(cur_tidx) + tlnc_wlnbr(cur_tidx - 1));
+        todo_cursor.offset -= tlnc_wlnbr(cur_tidx - 1) - tlnc_wlnbr(cur_tidx);
+        swap_todos(cur_tidx, cur_tidx - 1);
+      }
+      update_todo_curs(cur_tidx--, true);
       break;
     case 'x':
-      todos[todo_cursor.cur_todo_idx].is_completed = !(todos[todo_cursor.cur_todo_idx].is_completed);
-      render_todo(todo_cursor.offset, 0, todos[todo_cursor.cur_todo_idx], COLOR_PAIR(COLOR_HIGHLIGHT));
+      todos[cur_tidx].is_completed = !(todos[cur_tidx].is_completed);
+      render_todo(todo_cursor.offset, 0, todos[cur_tidx], COLOR_PAIR(COLOR_HIGHLIGHT));
       pad_rf(main_pad);
+    case 'm':
+      is_move_mode = !is_move_mode;
+      update_todo_curs(no_change, true);
+      break;
     case 'd':
       if(prev_c == 'd') {
         if(todo_count == 0) break;
 
-        delete_todo(&todos, todo_cursor.cur_todo_idx, &todo_count);
+        delete_todo(&todos, cur_tidx, &todo_count);
         render_todos();
 
-        if(todo_cursor.cur_todo_idx >= todo_count)
-          update_todo_curs(todo_cursor.cur_todo_idx--, true);
+        if(cur_tidx >= todo_count)
+          update_todo_curs(cur_tidx--, true);
         else
-          update_todo_curs(todo_cursor.cur_todo_idx, true);
+          update_todo_curs(cur_tidx, true);
 
         if(todo_count == 0) {
           pad_clear(main_pad);
