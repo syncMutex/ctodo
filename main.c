@@ -44,7 +44,7 @@ string get_new_input(char* placeholder) {
 
   clear();
   pad_clear(main_pad);
-  wprintw(main_pad.pad, placeholder);
+  wprintw(main_pad.pad, "%s", placeholder);
 
   bool quit = false;
   int c;
@@ -104,6 +104,7 @@ string get_new_input(char* placeholder) {
   }
 
   curs_set(0);
+  delwin(input_pad.pad);
 
   main_pad.cur_pos = pad_cur_pos;
 
@@ -125,6 +126,7 @@ void print_strike_through(char* str, int y, int x) {
     mvwaddstr(main_pad.pad, y, x, str);
     wattroff(main_pad.pad, A_DIM);
   #else
+    wmove(main_pad.pad, y, x);
     for(int i = 0; str[i] != '\0'; i++) {
       waddch(main_pad.pad, str[i]);
       waddstr(main_pad.pad, "\u0336");
@@ -173,6 +175,22 @@ int get_offset(int todo_idx) {
   return sum;
 }
 
+void adjust_scr_bounds(int cur_end_offset) {
+  int diff = 0;
+
+  if(cur_end_offset > todo_cursor.screen_bounds.lwr) {
+    diff = cur_end_offset - todo_cursor.screen_bounds.lwr;
+  } else if(todo_cursor.offset <= todo_cursor.screen_bounds.upr) {
+    diff = todo_cursor.offset - todo_cursor.screen_bounds.upr;
+  }
+
+  if(diff != 0) {
+    main_pad.cur_pos += diff;
+    todo_cursor.screen_bounds.lwr += diff;
+    todo_cursor.screen_bounds.upr += diff;
+  }
+}
+
 void update_todo_curs(int prevtidx, bool do_paint) {
   if(todos == NULL) return;
   int curtidx = todo_cursor.cur_todo_idx;
@@ -183,7 +201,8 @@ void update_todo_curs(int prevtidx, bool do_paint) {
   enum todo_colors ch = COLOR_PAIR(COLOR_HIGHLIGHT);
 
   if(prevtidx != curtidx) {
-    render_todo(todo_cursor.offset, 0, prev_todo, -1);
+    if(prevtidx < todo_count)
+      render_todo(todo_cursor.offset, 0, prev_todo, -1);
 
     if(curtidx > prevtidx)
       todo_cursor.offset += tlnc_wlnbr(prevtidx);
@@ -192,19 +211,7 @@ void update_todo_curs(int prevtidx, bool do_paint) {
 
     int cur_end_offset = tline_count(curtidx) + todo_cursor.offset + main_pad.offset.y;
 
-    int diff = 0;
-
-    if(cur_end_offset > todo_cursor.screen_bounds.lwr) {
-      diff = cur_end_offset - todo_cursor.screen_bounds.lwr;
-    } else if(todo_cursor.offset <= todo_cursor.screen_bounds.upr) {
-      diff = todo_cursor.offset - todo_cursor.screen_bounds.upr;
-    }
-
-    if(diff != 0) {
-      main_pad.cur_pos += diff;
-      todo_cursor.screen_bounds.lwr += diff;
-      todo_cursor.screen_bounds.upr += diff;
-    }
+    adjust_scr_bounds(cur_end_offset);
   }
 
   if(do_paint) {
@@ -273,6 +280,7 @@ int main() {
   update_todo_curs(0, true);
 
   bool quit = false;
+  int prev_c;
   while(!quit) {
     int c = getch();
 
@@ -303,7 +311,28 @@ int main() {
       todos[todo_cursor.cur_todo_idx].is_completed = !(todos[todo_cursor.cur_todo_idx].is_completed);
       render_todo(todo_cursor.offset, 0, todos[todo_cursor.cur_todo_idx], COLOR_PAIR(COLOR_HIGHLIGHT));
       pad_rf(main_pad);
+    case 'd':
+      if(prev_c == 'd') {
+        if(todo_count == 0) break;
+
+        delete_todo(&todos, todo_cursor.cur_todo_idx, &todo_count);
+        render_todos();
+
+        if(todo_cursor.cur_todo_idx >= todo_count)
+          update_todo_curs(todo_cursor.cur_todo_idx--, true);
+        else
+          update_todo_curs(todo_cursor.cur_todo_idx, true);
+
+        if(todo_count == 0) {
+          pad_clear(main_pad);
+          wprintw(main_pad.pad, "Man make some todos...");
+          win_clr_pad_rf(main_pad);
+        }
+
+        c = -1;
+      }
     }
+    prev_c = c;
   }
 
   for(int i = 0; i < todo_count; i++) free(todos[i].todo.val);

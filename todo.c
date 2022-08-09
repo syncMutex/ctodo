@@ -119,6 +119,28 @@ bool add_todo(todo** todos, int *todo_count, todo* new_todo) {
   return true;
 }
 
+bool delete_todo(todo** todos, int todo_idx, int* todo_count) {
+  if(*todo_count <= 0) return false;
+
+  todo* _todos = *todos;
+  todo t = _todos[todo_idx];
+  todo* new_todos;
+
+  if(*todo_count != 1) {
+    for(int i = todo_idx + 1, t_count = *todo_count; i < t_count; i++)
+      _todos[i - 1] = _todos[i];
+
+    new_todos = realloc(_todos, sizeof(todo) * (*todo_count - 1));
+    if(new_todos == NULL) return false;
+  } else {
+    new_todos = NULL;
+  }
+
+  (*todo_count)--;
+  free(t.todo.val);
+  return true;
+}
+
 void print_todo(todo t) {
   printf("{ todo: \"%s\", is_completed: %d, created_date: \"%s\", modified_date: \"%s\" }\n", 
     t.todo.val, 
