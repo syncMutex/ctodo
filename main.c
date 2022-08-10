@@ -47,7 +47,7 @@ string get_new_input(char* placeholder) {
 
   clear();
   pad_clear(main_pad);
-  wprintw(main_pad.pad, "%s", placeholder);
+  waddstr(main_pad.pad, placeholder);
 
   bool quit = false;
   int c;
@@ -285,7 +285,7 @@ int main() {
   test_todos();
 
   if(todo_count == 0) {
-    wprintw(main_pad.pad, "Man make some todos...");
+    waddstr(main_pad.pad, "Man make some todos...");
     win_clr_pad_rf(main_pad);
   } else {
     render_todos();
@@ -366,7 +366,7 @@ int main() {
 
         if(todo_count == 0) {
           pad_clear(main_pad);
-          wprintw(main_pad.pad, "Man make some todos...");
+          waddstr(main_pad.pad, "Man make some todos...");
           win_clr_pad_rf(main_pad);
         }
 
