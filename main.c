@@ -247,6 +247,20 @@ void clrnln_from(int from, int n) {
   }
 }
 
+void test_todos() {
+  string s = String("", -1);
+
+  for(int i = 0; i < 500; i++)
+    append_char(&s, 'a');
+
+  for(int i = 0; i < 15; i++) {
+    check_pad_space_add_todo(create_todo(s.val));
+    for(int j = 0; j < 30; j++) pop_char(&s);
+  }
+
+  free(s.val);
+}
+
 int main() {
   initscr();
 
@@ -268,18 +282,8 @@ int main() {
 
   todos = init_todos(&todo_count);
 
-  string s = String("", -1);
+  test_todos();
 
-  for(int i = 0; i < 500; i++)
-    append_char(&s, 'a');
-
-  for(int i = 0; i < 15; i++) {
-    check_pad_space_add_todo(create_todo(s.val));
-    for(int j = 0; j < 30; j++) pop_char(&s);
-  }
-
-  free(s.val);
-  
   if(todo_count == 0) {
     wprintw(main_pad.pad, "Man make some todos...");
     win_clr_pad_rf(main_pad);
@@ -309,10 +313,17 @@ int main() {
       todo* new_todo = get_new_todo_input();
       check_pad_space_add_todo(new_todo);
       render_todos();
-      while(cur_tidx != todo_count - 2)
-        update_todo_curs(cur_tidx++, false);
+      
+      if(todo_count <= 2) {
+        cur_tidx = todo_count - 1;
+        todo_cursor.offset = get_offset(cur_tidx);
+        update_todo_curs(no_change, true);
+      } else {
+        while(cur_tidx != todo_count - 2)
+          update_todo_curs(cur_tidx++, false);
+        update_todo_curs(cur_tidx++, true);
+      }
 
-      update_todo_curs(cur_tidx++, true);
       break;
     case KEY_DOWN:
     case 'j':
