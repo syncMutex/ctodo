@@ -39,8 +39,12 @@ PAD main_pad;
 #define update_todo_curs(pos, do_paint) _update_todo_curs(pos, do_paint, is_move_mode)
 #define cur_tidx todo_cursor.cur_todo_idx
 
-string get_new_input(char* placeholder) {
+string get_new_input(char* init_str, char* placeholder) {
   PAD input_pad = new_subpad(main_pad, -1, -1, 3, 1);
+
+  #define refresh_input_pad() pad_clear(input_pad);\
+  mvwaddstr(input_pad.pad, 0, 0, str.val);\
+  pad_rf(input_pad)
 
   int pad_cur_pos = main_pad.cur_pos;
   main_pad.cur_pos = 0;
@@ -51,13 +55,12 @@ string get_new_input(char* placeholder) {
 
   bool quit = false;
   int c;
-  coord MIN_CURS_POS = {.x = 0, .y = 0};
-  coord curs_pos = {.x = MIN_CURS_POS.x, .y = MIN_CURS_POS.y};
-  string str = String("", -1);
+  string str = String(init_str, -1);
+  coord curs_pos = {.x = str.length, .y = 0};
 
   curs_set(1);
-  mvwaddch(main_pad.pad, curs_pos.y, curs_pos.x - 1, ' ');
   win_clr_pad_rf(main_pad);
+  refresh_input_pad();
 
   #define quit_loop() quit = true; break
 
@@ -65,13 +68,16 @@ string get_new_input(char* placeholder) {
     c = getch();
     switch(c) {
     case KEY_LEFT:
-      if(curs_pos.x <= MIN_CURS_POS.x) break;
+      if(curs_pos.x <= 0) break;
       curs_pos.x--;
-      wmove(main_pad.pad, curs_pos.y, curs_pos.x);
+      wmove(input_pad.pad, curs_pos.y, curs_pos.x);
+      pad_rf(main_pad);
       break;
     case KEY_RIGHT:
       if(curs_pos.x >= str.length - 1) break;
-      wmove(main_pad.pad, curs_pos.y, ++curs_pos.x);
+      curs_pos.x++;
+      wmove(input_pad.pad, curs_pos.y, curs_pos.x);
+      pad_rf(main_pad);
       break;
     case 10:
     case KEY_ENTER:
@@ -79,7 +85,7 @@ string get_new_input(char* placeholder) {
     case 8:
     case 127:
     case KEY_BACKSPACE:
-      if(curs_pos.x <= MIN_CURS_POS.x) break;
+      if(curs_pos.x - 1 < 0) break;
       if(!pop_char(&str)) {
         printf("error while pop_char\n");
         quit_loop();
@@ -87,23 +93,14 @@ string get_new_input(char* placeholder) {
       curs_pos.x--;
       break;
     default:
-      if(str.length == curs_pos.x - MIN_CURS_POS.x) {
-        if(!append_char(&str, c)) {
-          printf("error while _char\n");
-          quit_loop();
-        }
-      } else {
-        if(!insert_char(&str, c, curs_pos.x - MIN_CURS_POS.x)) {
-          printf("error while insert_char\n");
-          quit_loop();
-        }
+      if(!insert_char(&str, c, curs_pos.x)) {
+        printf("error while insert_char\n");
+        quit_loop();
       }
       curs_pos.x++;
     }
 
-    pad_clear(input_pad);
-    mvwaddstr(input_pad.pad, MIN_CURS_POS.y, MIN_CURS_POS.x, str.val);
-    pad_rf(input_pad);
+    refresh_input_pad();
   }
 
   curs_set(0);
@@ -115,12 +112,23 @@ string get_new_input(char* placeholder) {
 }
 
 todo* get_new_todo_input() {
-  string str = get_new_input("New todo\n\n");
+  string str = get_new_input("", "New todo\n\n");
   todo* t = NULL;
   if(str.length != 0)
     t = create_todo(str.val);
   free(str.val);
   return t;
+}
+
+bool modify_todo(todo* t) {
+  if(t == NULL) return false;
+  string str = get_new_input(t->todo.val, "Edit todo\n\n");
+
+  set_str(&(t->todo), str.val);
+
+  free(str.val);
+
+  return true;
 }
 
 void print_strike_through(char* str, int y, int x) {
@@ -324,6 +332,11 @@ int main() {
         update_todo_curs(cur_tidx++, true);
       }
 
+      break;
+    case 'i':
+      modify_todo(&(todos[cur_tidx]));
+      render_todos();
+      update_todo_curs(no_change, true);
       break;
     case KEY_DOWN:
     case 'j':

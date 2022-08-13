@@ -8,9 +8,9 @@
 string String(const char* init_string, size_t capacity) {
   size_t length = strlen(init_string);
   
-  assert(length <= capacity);
-
   if(capacity == -1) capacity = length;
+
+  assert(length <= capacity);
 
   char* s = malloc((sizeof(char) * capacity) + 1);
   strcpy(s, init_string);
@@ -75,7 +75,6 @@ bool append_char(string* str, char c) {
 }
 
 bool insert_char(string* str, char c, int idx) {
-  printf("idx: %d\n", idx);
   if((str->length + 1) > str->capacity) {
     char* new_val = realloc(str->val, str->length + 2);
 
@@ -90,8 +89,8 @@ bool insert_char(string* str, char c, int idx) {
 
   str->length++;
   str->val[str->length] = '\0';
-
-  for(int i = str->length - 2; i > idx; i++) str->val[i + 1] = str->val[i];
+  
+  for(int i = idx + 1; i < str->length; i++) str->val[i] = str->val[i + 1];
   str->val[idx] = c;
 
   return true;
