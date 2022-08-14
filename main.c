@@ -39,12 +39,21 @@ PAD main_pad;
 #define update_todo_curs(pos, do_paint) _update_todo_curs(pos, do_paint, is_move_mode)
 #define cur_tidx todo_cursor.cur_todo_idx
 
+void wprint_str_from(string str, PAD pad, coord curs_pos, int str_idx) {
+  wmove(pad.pad, curs_pos.y, curs_pos.x);
+  wclrtobot(pad.pad);
+  for(int i = str_idx; i < str.length; i++) {
+    if(mvwaddch(pad.pad, curs_pos.y, curs_pos.x++, str.val[i]) == ERR) {
+      curs_pos.y++;
+      curs_pos.x = 0;
+      i--;
+      continue;
+    }
+  }
+}
+
 string get_new_input(char* init_str, char* placeholder) {
   PAD input_pad = new_subpad(main_pad, -1, -1, 3, 1);
-
-  #define refresh_input_pad() pad_clear(input_pad);\
-  mvwaddstr(input_pad.pad, 0, 0, str.val);\
-  pad_rf(input_pad)
 
   int pad_cur_pos = main_pad.cur_pos;
   main_pad.cur_pos = 0;
@@ -53,31 +62,32 @@ string get_new_input(char* init_str, char* placeholder) {
   pad_clear(main_pad);
   waddstr(main_pad.pad, placeholder);
 
-  bool quit = false;
-  int c;
   string str = String(init_str, -1);
   coord curs_pos = {.x = str.length, .y = 0};
+  int str_idx = str.length;
 
   curs_set(1);
   win_clr_pad_rf(main_pad);
-  refresh_input_pad();
 
   #define quit_loop() quit = true; break
+  #define check_left_bounds() if(curs_pos.x < 0){curs_pos.x = input_pad.dimen.x - 1;curs_pos.y--;}
+  #define check_right_bounds() if(curs_pos.x > input_pad.dimen.x){curs_pos.x = 1;curs_pos.y++;}
 
+  #define go_left() curs_pos.x--; str_idx--; check_left_bounds()
+  #define go_right() curs_pos.x++; str_idx++; check_right_bounds()
+
+  bool quit = false;
+  int c;
   while(!quit) {
     c = getch();
     switch(c) {
     case KEY_LEFT:
-      if(curs_pos.x <= 0) break;
-      curs_pos.x--;
-      wmove(input_pad.pad, curs_pos.y, curs_pos.x);
-      pad_rf(main_pad);
+      if(str_idx <= 0) break;
+      go_left();
       break;
     case KEY_RIGHT:
-      if(curs_pos.x >= str.length - 1) break;
-      curs_pos.x++;
-      wmove(input_pad.pad, curs_pos.y, curs_pos.x);
-      pad_rf(main_pad);
+      if(str_idx > str.length - 1) break;
+      go_right();
       break;
     case 10:
     case KEY_ENTER:
@@ -85,22 +95,24 @@ string get_new_input(char* init_str, char* placeholder) {
     case 8:
     case 127:
     case KEY_BACKSPACE:
-      if(curs_pos.x - 1 < 0) break;
-      if(!pop_char(&str)) {
+      if(str_idx - 1 < 0) break;
+      if(!remove_char(&str, str_idx - 1)) {
         printf("error while pop_char\n");
         quit_loop();
       }
-      curs_pos.x--;
+      go_left();
+      wprint_str_from(str, input_pad, curs_pos, str_idx);
       break;
     default:
-      if(!insert_char(&str, c, curs_pos.x)) {
+      if(!insert_char(&str, c, str_idx)) {
         printf("error while insert_char\n");
         quit_loop();
       }
-      curs_pos.x++;
+      wprint_str_from(str, input_pad, curs_pos, str_idx);
+      go_right();
     }
-
-    refresh_input_pad();
+    wmove(input_pad.pad, curs_pos.y, curs_pos.x);
+    pad_rf(input_pad);
   }
 
   curs_set(0);
@@ -361,6 +373,7 @@ int main() {
       todos[cur_tidx].is_completed = !(todos[cur_tidx].is_completed);
       render_todo(todo_cursor.offset, 0, todos[cur_tidx], COLOR_PAIR(COLOR_HIGHLIGHT));
       pad_rf(main_pad);
+      break;
     case 'm':
       is_move_mode = !is_move_mode;
       update_todo_curs(no_change, true);

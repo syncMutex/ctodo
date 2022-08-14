@@ -17,6 +17,7 @@ typedef struct {
 string String(const char* s, size_t capacity);
 bool set_str(string* str, char* new_string);
 bool insert_char(string* str, char c, int idx);
+bool remove_char(string* str, int idx);
 bool append_char(string* str, char c);
 bool pop_char(string* str);
 bool str_cat_str(string* dest, string* src);
