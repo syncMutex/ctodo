@@ -38,18 +38,20 @@ PAD main_pad;
 #define no_change cur_tidx
 #define update_todo_curs(pos, do_paint) _update_todo_curs(pos, do_paint, is_move_mode)
 #define cur_tidx todo_cursor.cur_todo_idx
+#define KEY_ESC 27
 
-void wprint_str_from(string str, PAD pad, coord curs_pos, int str_idx) {
+#define wprint_and_update_curs(_pad, str, curs_pos, str_idx) for(int i = str_idx; i < str.length; i++)\
+  if(mvwaddch(_pad.pad, curs_pos.y, curs_pos.x++, str.val[i]) == ERR) {\
+    curs_pos.y++;\
+    curs_pos.x = 0;\
+    i--;\
+    continue;\
+  }
+
+void wprint_str_from(PAD pad, string str, coord curs_pos, int str_idx) {
   wmove(pad.pad, curs_pos.y, curs_pos.x);
   wclrtobot(pad.pad);
-  for(int i = str_idx; i < str.length; i++) {
-    if(mvwaddch(pad.pad, curs_pos.y, curs_pos.x++, str.val[i]) == ERR) {
-      curs_pos.y++;
-      curs_pos.x = 0;
-      i--;
-      continue;
-    }
-  }
+  wprint_and_update_curs(pad, str, curs_pos, str_idx);
 }
 
 string get_new_input(char* init_str, char* placeholder) {
@@ -63,11 +65,14 @@ string get_new_input(char* init_str, char* placeholder) {
   waddstr(main_pad.pad, placeholder);
 
   string str = String(init_str, -1);
-  coord curs_pos = {.x = str.length, .y = 0};
-  int str_idx = str.length;
+  coord curs_pos = {.x = 0, .y = 0};
+  int str_idx = 0;
 
   curs_set(1);
   win_clr_pad_rf(main_pad);
+  wprint_and_update_curs(input_pad, str, curs_pos, str_idx);
+  str_idx = str.length;
+  pad_rf(input_pad);
 
   #define quit_loop() quit = true; break
   #define check_left_bounds() if(curs_pos.x < 0){curs_pos.x = input_pad.dimen.x - 1;curs_pos.y--;}
@@ -81,12 +86,15 @@ string get_new_input(char* init_str, char* placeholder) {
   while(!quit) {
     c = getch();
     switch(c) {
+    case KEY_ESC:
+      set_str(&str, "");
+      quit_loop();
     case KEY_LEFT:
       if(str_idx <= 0) break;
       go_left();
       break;
     case KEY_RIGHT:
-      if(str_idx > str.length - 1) break;
+      if(str_idx >= str.length) break;
       go_right();
       break;
     case 10:
@@ -101,14 +109,14 @@ string get_new_input(char* init_str, char* placeholder) {
         quit_loop();
       }
       go_left();
-      wprint_str_from(str, input_pad, curs_pos, str_idx);
+      wprint_str_from(input_pad, str, curs_pos, str_idx);
       break;
     default:
       if(!insert_char(&str, c, str_idx)) {
         printf("error while insert_char\n");
         quit_loop();
       }
-      wprint_str_from(str, input_pad, curs_pos, str_idx);
+      wprint_str_from(input_pad, str, curs_pos, str_idx);
       go_right();
     }
     wmove(input_pad.pad, curs_pos.y, curs_pos.x);
@@ -136,7 +144,8 @@ bool modify_todo(todo* t) {
   if(t == NULL) return false;
   string str = get_new_input(t->todo.val, "Edit todo\n\n");
 
-  set_str(&(t->todo), str.val);
+  if(str.length != 0)
+    set_str(&(t->todo), str.val);
 
   free(str.val);
 
@@ -325,6 +334,8 @@ int main() {
   while(!quit) {
     int c = getch();
 
+    if(is_move_mode && (c == 'n' || c == 'i' || c == 'x' || c == 'd')) continue;
+
     switch(c) {
     case 'q':
       quit = true;
@@ -376,6 +387,13 @@ int main() {
       break;
     case 'm':
       is_move_mode = !is_move_mode;
+      update_todo_curs(no_change, true);
+      break;
+    case 10:
+    case KEY_ENTER:
+      if(!is_move_mode) break;
+    case KEY_ESC:
+      is_move_mode = false;
       update_todo_curs(no_change, true);
       break;
     case 'd':

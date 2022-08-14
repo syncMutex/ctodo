@@ -55,6 +55,7 @@ bool pop_char(string* str) {
 }
 
 bool remove_char(string* str, int idx) {
+  assert(idx < str->length && idx >= 0);
   if(str->length <= 0 || idx < 0 || idx >= str->length) return false;
   for(int i = idx; i < str->length; i++) str->val[i] = str->val[i + 1];
   str->val[str->length - 1] = '\0';
@@ -83,6 +84,7 @@ bool append_char(string* str, char c) {
 }
 
 bool insert_char(string* str, char c, int idx) {
+  assert(idx <= str->length && idx >= 0);
   if((str->length + 1) > str->capacity) {
     char* new_val = realloc(str->val, str->length + 2);
 
