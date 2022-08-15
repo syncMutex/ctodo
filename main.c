@@ -7,6 +7,7 @@
 #include "./window.h"
 #include "./init-funcs.h"
 
+const char* TODO_FILE_NAME = "todos.bin";
 todo* todos = NULL;
 int todo_count = 0;
 
@@ -31,6 +32,7 @@ void print_tcurs() {
 }
 
 PAD main_pad;
+PAD top_bar;
 
 #define tline_count(tidx) ((todos[tidx].todo.length + 3) / main_pad.max.x + 1)
 #define pad_clear(p) wclear(p.pad)
@@ -55,7 +57,7 @@ void wprint_str_from(PAD pad, string str, coord curs_pos, int str_idx) {
 }
 
 string get_new_input(char* init_str, char* placeholder) {
-  PAD input_pad = new_subpad(main_pad, -1, -1, 3, 1);
+  PAD input_pad = new_subpad(main_pad, -1, -1, main_pad.offset.y + 2, 1);
 
   int pad_cur_pos = main_pad.cur_pos;
   main_pad.cur_pos = 0;
@@ -144,12 +146,13 @@ bool modify_todo(todo* t) {
   if(t == NULL) return false;
   string str = get_new_input(t->todo.val, "Edit todo\n\n");
 
-  if(str.length != 0)
-    edit_todo(t, str.val);
+  bool can_save = true;
 
+  can_save = str.length != 0 ? edit_todo(t, str.val) : false;
+     
   free(str.val);
 
-  return true;
+  return can_save;
 }
 
 void view_cur_todo_details() {
@@ -295,17 +298,20 @@ void _update_todo_curs(int prevtidx, bool do_paint, bool is_move_mode) {
   }
 }
 
+void resize_main_pad_if_needed() {
+  if(todo_cursor.max_offset >= main_pad.dimen.y) {
+    main_pad.dimen.y = todo_cursor.max_offset;
+    wresize(main_pad.pad, main_pad.dimen.y, main_pad.dimen.x);
+  }
+}
+
 void check_pad_space_add_todo(todo* new_todo) {
   if(new_todo != NULL)
     add_todo(&todos, &todo_count, new_todo);
   else return;
 
   todo_cursor.max_offset += tlnc_wlnbr(todo_count - 1);
-
-  if(todo_cursor.max_offset >= main_pad.dimen.y) {
-    main_pad.dimen.y = todo_cursor.max_offset;
-    wresize(main_pad.pad, main_pad.dimen.y, main_pad.dimen.x);
-  }
+  resize_main_pad_if_needed();
 }
 
 void swap_todos(int idx1, int idx2) {
@@ -339,6 +345,20 @@ void test_todos() {
   free(s.val);
 }
 
+void update_top_bar(bool can_save) {
+  pad_clear(top_bar);
+  if(can_save) {
+    wattron(top_bar.pad, COLOR_PAIR(COLOR_PENDING));
+    mvwprintw(top_bar.pad, 0, 0, "you have unsaved changes");
+    wattroff(top_bar.pad, COLOR_PAIR(COLOR_PENDING));
+  } else {
+    wattron(top_bar.pad, COLOR_PAIR(COLOR_COMPLETE));
+    mvwprintw(top_bar.pad, 0, 0, "saved changes");
+    wattroff(top_bar.pad, COLOR_PAIR(COLOR_COMPLETE));
+  }
+  pad_rf(top_bar);
+}
+
 int main() {
   initscr();
 
@@ -355,19 +375,19 @@ int main() {
   curs_set(0);
 
   int maxx = getmaxx(stdscr);
-  // maxx - 2 because of offset 1
-  main_pad = new_pad(-1, maxx - 1, 1, 1);
+  main_pad = new_pad(-1, maxx - 1, 2, 1);
+  top_bar = new_pad(1, -1, 0, 0);
 
   refresh();
 
-  todos = init_todos(&todo_count);
-
-  test_todos();
+  todos = init_todos(&todo_count, TODO_FILE_NAME);
 
   if(todo_count == 0) {
     waddstr(main_pad.pad, "Man make some todos...");
     win_clr_pad_rf(main_pad);
   } else {
+    todo_cursor.max_offset = get_offset(todo_count);
+    resize_main_pad_if_needed();
     render_todos();
   }
 
@@ -378,23 +398,35 @@ int main() {
 
   bool quit = false;
   bool is_move_mode = false;
+  bool can_save = false;
   int prev_c;
 
-  update_todo_curs(0, true);
+  if(todo_count != 0)
+    update_todo_curs(0, true);
+
+  #define quit_loop() quit = true; break
+
+  #define set_can_save(to) can_save = to; update_top_bar(can_save)
 
   while(!quit) {
     int c = getch();
 
     if(is_move_mode && (c == 'n' || c == 'i' || c == 'x' || c == 'd' || c == 'o')) continue;
 
-    if(todo_count == 0 && (c != 'n' && c != 'q')) continue;
+    if(todo_count == 0 && (c != 'n' && c != 'q' && c != 'w')) continue;
 
     switch(c) {
     case 'q':
-      quit = true;
-      break;
+      quit_loop();
     case 'n':;
       todo* new_todo = get_new_todo_input();
+      
+      if(new_todo == NULL) {
+        render_todos();
+        update_todo_curs(no_change, true);
+        break;
+      }
+
       check_pad_space_add_todo(new_todo);
       render_todos();
       
@@ -408,11 +440,14 @@ int main() {
         update_todo_curs(cur_tidx++, true);
       }
 
+      set_can_save(true);
+
       break;
     case 'i':
-      modify_todo(&(todos[cur_tidx]));
+      can_save = modify_todo(&(todos[cur_tidx]));
       render_todos();
       update_todo_curs(no_change, true);
+      update_top_bar(can_save);
       break;
     case 'o':
       view_cur_todo_details();
@@ -423,6 +458,7 @@ int main() {
     case 'j':
       if(cur_tidx >= todo_count - 1) break;
       if(is_move_mode) {
+        set_can_save(true);
         swap_todos(cur_tidx, cur_tidx + 1);
         clrnln_from(todo_cursor.offset, tlnc_wlnbr(cur_tidx) + tlnc_wlnbr(cur_tidx + 1));
       }
@@ -432,6 +468,7 @@ int main() {
     case 'k':
       if(cur_tidx <= 0) break;
       if(is_move_mode) {
+        set_can_save(true);
         clrnln_from(todo_cursor.offset - tlnc_wlnbr(cur_tidx - 1), tlnc_wlnbr(cur_tidx) + tlnc_wlnbr(cur_tidx - 1));
         todo_cursor.offset -= tlnc_wlnbr(cur_tidx - 1) - tlnc_wlnbr(cur_tidx);
         swap_todos(cur_tidx, cur_tidx - 1);
@@ -442,6 +479,7 @@ int main() {
       todos[cur_tidx].is_completed = !(todos[cur_tidx].is_completed);
       render_todo(todo_cursor.offset, 0, todos[cur_tidx], COLOR_PAIR(COLOR_HIGHLIGHT));
       pad_rf(main_pad);
+      set_can_save(true);
       break;
     case 'm':
       is_move_mode = !is_move_mode;
@@ -453,6 +491,15 @@ int main() {
     case KEY_ESC:
       is_move_mode = false;
       update_todo_curs(no_change, true);
+      break;
+    case 'w':
+      if(!can_save) break;
+      if(!write_todos_to_file(TODO_FILE_PATH.val, todos, todo_count)) {
+        endwin();
+        printf("error while writing todos to file.\n");
+        quit_loop();
+      }
+      set_can_save(false);
       break;
     case 'd':
       if(prev_c == 'd') {
@@ -472,6 +519,7 @@ int main() {
           win_clr_pad_rf(main_pad);
         }
 
+        set_can_save(true);
         c = -1;
       }
     }
@@ -480,6 +528,7 @@ int main() {
 
   for(int i = 0; i < todo_count; i++) free(todos[i].todo.val);
   free(todos);
+  free(TODO_FILE_PATH.val);
   
   delwin(main_pad.pad);
   endwin();

@@ -16,17 +16,16 @@
 
 #include "./todo.h"
 #include "./todo-colors.h"
+#include "./init-funcs.h"
 
-const char* TODO_FILE_NAME = "todos.bin";
-
-todo* init_todos(int* todo_count) {
+todo* init_todos(int* todo_count, const char* TODO_FILE_NAME) {
   #ifdef _WIN32
     const char* TODO_DIR_PATH = strcat(getenv("APPDATA"), "/ctodo");
   #else
     const char* TODO_DIR_PATH = strcat(getenv("HOME"), "/.local/share/ctodo");
   #endif
 
-  string TODO_FILE_PATH = String(TODO_DIR_PATH, -1);
+  TODO_FILE_PATH = String(TODO_DIR_PATH, -1);
 
   str_cat_charptr(&TODO_FILE_PATH, "/");
   str_cat_charptr(&TODO_FILE_PATH, TODO_FILE_NAME);
@@ -35,7 +34,6 @@ todo* init_todos(int* todo_count) {
 
   *todo_count = 0;
   todo* todos = read_todos_from_file(TODO_FILE_PATH.val, todo_count);
-  free(TODO_FILE_PATH.val);
   
   return todos;
 }
