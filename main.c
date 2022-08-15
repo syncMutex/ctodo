@@ -153,8 +153,12 @@ bool modify_todo(todo* t) {
 }
 
 void view_cur_todo_details() {
-  PAD todo_details_pad = new_subpad(main_pad, -1, -1, 1, 1);
   todo t = todos[cur_tidx];
+  int dimenx = main_pad.max.x - 1 < 80 ? main_pad.max.x - 2 : 80;
+  int max_cur_pos = 7 + ((t.todo.length + 6) / dimenx + 1);
+
+  PAD todo_details_pad = new_subpad(main_pad, max_cur_pos, dimenx, 1, 1);
+
   clear();
   pad_clear(main_pad);
 
@@ -173,7 +177,24 @@ void view_cur_todo_details() {
   win_clr_pad_rf(todo_details_pad);
   
   int c = -1;
-  while(c != 27 && c != 10 && c != KEY_ENTER) c = getch();
+  while(c != 27 && c != 10 && c != KEY_ENTER) {
+    c = getch();
+    switch(c) {
+    case KEY_DOWN:
+    case 'j':
+      if(todo_details_pad.cur_pos >= max_cur_pos - 2) break;
+      todo_details_pad.cur_pos++;
+      win_clr_pad_rf(todo_details_pad);
+      break;
+    case KEY_UP:
+    case 'k':
+      if(todo_details_pad.cur_pos <= 0) break;
+      todo_details_pad.cur_pos--;
+      win_clr_pad_rf(todo_details_pad);
+      break;
+    }
+  }
+  delwin(todo_details_pad.pad);
 }
 
 void print_strike_through(char* str, int y, int x) {
@@ -303,8 +324,12 @@ void clrnln_from(int from, int n) {
 void test_todos() {
   string s = String("", -1);
 
-  for(int i = 0; i < 500; i++)
-    append_char(&s, 'a');
+  int c = 97;
+
+  for(int i = 0; i < 500; i++, c++) {
+    if(c == 97 + 26) c = 97;
+    append_char(&s, c);
+  }
 
   for(int i = 0; i < 15; i++) {
     check_pad_space_add_todo(create_todo(s.val));
@@ -329,7 +354,9 @@ int main() {
   cbreak();
   curs_set(0);
 
-  main_pad = new_pad(-1, -1, 1, 1);
+  int maxx = getmaxx(stdscr);
+  // maxx - 2 because of offset 1
+  main_pad = new_pad(-1, maxx - 1, 1, 1);
 
   refresh();
 
@@ -359,6 +386,8 @@ int main() {
     int c = getch();
 
     if(is_move_mode && (c == 'n' || c == 'i' || c == 'x' || c == 'd' || c == 'o')) continue;
+
+    if(todo_count == 0 && (c != 'n' && c != 'q')) continue;
 
     switch(c) {
     case 'q':

@@ -6,8 +6,11 @@
 PAD new_pad(int dimeny, int dimenx, int offsety, int offsetx) {
   assert(offsetx >= 0 && offsety >= 0);
   PAD pad;
-  if(dimenx == -1 && dimeny == -1)
-    getmaxyx(stdscr, dimeny, dimenx);
+
+  if(dimenx == -1)
+    dimenx = getmaxx(stdscr);
+  if(dimeny == -1)
+    dimeny = getmaxy(stdscr);
 
   pad.pad = newpad(dimeny, dimenx);
   pad.dimen.x = dimenx;
@@ -15,6 +18,8 @@ PAD new_pad(int dimeny, int dimenx, int offsety, int offsetx) {
   pad.offset.x = offsetx;
   pad.offset.y = offsety;
   getmaxyx(stdscr, pad.max.y, pad.max.x);
+
+  if(pad.max.x > pad.dimen.x) pad.max.x = pad.dimen.x;
 
   pad.cur_pos = 0;
 
