@@ -145,11 +145,35 @@ bool modify_todo(todo* t) {
   string str = get_new_input(t->todo.val, "Edit todo\n\n");
 
   if(str.length != 0)
-    set_str(&(t->todo), str.val);
+    edit_todo(t, str.val);
 
   free(str.val);
 
   return true;
+}
+
+void view_cur_todo_details() {
+  PAD todo_details_pad = new_subpad(main_pad, -1, -1, 1, 1);
+  todo t = todos[cur_tidx];
+  clear();
+  pad_clear(main_pad);
+
+  wmove(todo_details_pad.pad, 0, 0);
+  wprintw(todo_details_pad.pad,
+    "todo: %s\n\ncreated on: %s\n\nmodified on: %s\n\n",
+    t.todo.val, t.created_date, t.modified_date);
+
+  enum todo_colors att = COLOR_PAIR(t.is_completed ? COLOR_COMPLETE_TEXT : COLOR_PENDING_TEXT);
+
+  waddstr(todo_details_pad.pad, "status: ");
+  wattron(todo_details_pad.pad, att);
+  waddstr(todo_details_pad.pad, t.is_completed ? "completed" : "pending");
+  wattroff(todo_details_pad.pad, att);
+  
+  win_clr_pad_rf(todo_details_pad);
+  
+  int c = -1;
+  while(c != 27 && c != 10 && c != KEY_ENTER) c = getch();
 }
 
 void print_strike_through(char* str, int y, int x) {
@@ -334,7 +358,7 @@ int main() {
   while(!quit) {
     int c = getch();
 
-    if(is_move_mode && (c == 'n' || c == 'i' || c == 'x' || c == 'd')) continue;
+    if(is_move_mode && (c == 'n' || c == 'i' || c == 'x' || c == 'd' || c == 'o')) continue;
 
     switch(c) {
     case 'q':
@@ -358,6 +382,11 @@ int main() {
       break;
     case 'i':
       modify_todo(&(todos[cur_tidx]));
+      render_todos();
+      update_todo_curs(no_change, true);
+      break;
+    case 'o':
+      view_cur_todo_details();
       render_todos();
       update_todo_curs(no_change, true);
       break;

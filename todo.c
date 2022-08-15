@@ -93,14 +93,14 @@ todo* create_todo(char* todo_string) {
   todo* newtodo = malloc(sizeof(todo));
   if(newtodo == NULL) return NULL;
 
-  time_t t = time(NULL); 
-  struct tm time = *localtime(&t);
-  char created_date[11];
+  time_t ti = time(NULL); 
+  struct tm time = *localtime(&ti);
+  char cur_date[11];
 
-  sprintf(created_date, "%d-%d-%d", time.tm_mday, time.tm_mon + 1, time.tm_year + 1900);
+  sprintf(cur_date, "%d-%d-%d", time.tm_mday, time.tm_mon + 1, time.tm_year + 1900);
 
-  strncpy(newtodo->created_date, created_date, 10);
-  strncpy(newtodo->modified_date, created_date, 10);
+  strncpy(newtodo->created_date, cur_date, 10);
+  strncpy(newtodo->modified_date, cur_date, 10);
   newtodo->todo = String(todo_string, -1);
   newtodo->is_completed = false;
 
@@ -139,6 +139,17 @@ bool delete_todo(todo** _todos, int todo_idx, int* todo_count) {
 
   *_todos = new_todos;
   (*todo_count)--;
+  return true;
+}
+
+bool edit_todo(todo* t, char* new_todo_text) {
+  set_str(&(t->todo), new_todo_text);
+  time_t ti = time(NULL); 
+  struct tm time = *localtime(&ti);
+  char cur_date[11];
+
+  sprintf(cur_date, "%d-%d-%d", time.tm_mday, time.tm_mon + 1, time.tm_year + 1900);
+  strncpy(t->modified_date, cur_date, 10);
   return true;
 }
 
