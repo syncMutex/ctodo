@@ -4,9 +4,10 @@
 #include "./todo.h"
 #include "./string/string.h"
 
-string TODO_FILE_PATH;
+extern string TODO_FILE_PATH;
+extern char* TODO_FILE_NAME;
 
-todo* init_todos(int* todo_count, const char* file_name);
+todo* init_todos(int* todo_count);
 void init_colors();
 
 #endif // _INIT_FUNCS_

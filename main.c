@@ -7,7 +7,6 @@
 #include "./window.h"
 #include "./init-funcs.h"
 
-const char* TODO_FILE_NAME = "todos.bin";
 todo* todos = NULL;
 int todo_count = 0;
 
@@ -33,6 +32,7 @@ void print_tcurs() {
 
 PAD main_pad;
 PAD top_bar;
+PAD status_bar;
 
 #define tline_count(tidx) ((todos[tidx].todo.length + 3) / main_pad.max.x + 1)
 #define pad_clear(p) wclear(p.pad)
@@ -359,6 +359,13 @@ void update_top_bar(bool can_save) {
   pad_rf(top_bar);
 }
 
+void update_status_bar() {
+  pad_clear(status_bar);
+  if(todo_count == 0) return;
+  wprintw(status_bar.pad, "%d/%d", cur_tidx + 1, todo_count);
+  pad_rf(status_bar);
+}
+
 int main() {
   initscr();
 
@@ -377,10 +384,11 @@ int main() {
   int maxx = getmaxx(stdscr);
   main_pad = new_pad(-1, maxx - 1, 2, 1);
   top_bar = new_pad(1, -1, 0, 0);
+  status_bar = new_pad(1, -1, 0, 28);
 
   refresh();
 
-  todos = init_todos(&todo_count, TODO_FILE_NAME);
+  todos = init_todos(&todo_count);
 
   if(todo_count == 0) {
     waddstr(main_pad.pad, "Man make some todos...");
@@ -390,6 +398,8 @@ int main() {
     resize_main_pad_if_needed();
     render_todos();
   }
+
+  update_status_bar();
 
   todo_cursor.offset = get_offset(0);
   todo_cursor.screen_bounds.upr = main_pad.offset.y;
@@ -441,6 +451,7 @@ int main() {
       }
 
       set_can_save(true);
+      update_status_bar();
 
       break;
     case 'i':
@@ -448,11 +459,13 @@ int main() {
       render_todos();
       update_todo_curs(no_change, true);
       update_top_bar(can_save);
+      update_status_bar();
       break;
     case 'o':
       view_cur_todo_details();
       render_todos();
       update_todo_curs(no_change, true);
+      update_status_bar();
       break;
     case KEY_DOWN:
     case 'j':
@@ -463,6 +476,7 @@ int main() {
         clrnln_from(todo_cursor.offset, tlnc_wlnbr(cur_tidx) + tlnc_wlnbr(cur_tidx + 1));
       }
       update_todo_curs(cur_tidx++, true);
+      update_status_bar();
       break;
     case KEY_UP:
     case 'k':
@@ -474,6 +488,7 @@ int main() {
         swap_todos(cur_tidx, cur_tidx - 1);
       }
       update_todo_curs(cur_tidx--, true);
+      update_status_bar();
       break;
     case 'x':
       todos[cur_tidx].is_completed = !(todos[cur_tidx].is_completed);
@@ -484,6 +499,7 @@ int main() {
     case 'm':
       is_move_mode = !is_move_mode;
       update_todo_curs(no_change, true);
+      update_status_bar();
       break;
     case 10:
     case KEY_ENTER:
@@ -500,6 +516,7 @@ int main() {
         quit_loop();
       }
       set_can_save(false);
+      update_status_bar();
       break;
     case 'd':
       if(prev_c == 'd') {
@@ -508,10 +525,11 @@ int main() {
         delete_todo(&todos, cur_tidx, &todo_count);
         render_todos();
 
-        if(cur_tidx >= todo_count)
+        if(cur_tidx >= todo_count) {
           update_todo_curs(cur_tidx--, true);
-        else
+        } else { 
           update_todo_curs(cur_tidx, true);
+        }
 
         if(todo_count == 0) {
           pad_clear(main_pad);
@@ -520,6 +538,7 @@ int main() {
         }
 
         set_can_save(true);
+        update_status_bar();
         c = -1;
       }
     }
@@ -531,6 +550,8 @@ int main() {
   free(TODO_FILE_PATH.val);
   
   delwin(main_pad.pad);
+  delwin(status_bar.pad);
+  delwin(top_bar.pad);
   endwin();
   return 0;
 }

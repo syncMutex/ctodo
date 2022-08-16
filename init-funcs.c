@@ -18,7 +18,10 @@
 #include "./todo-colors.h"
 #include "./init-funcs.h"
 
-todo* init_todos(int* todo_count, const char* TODO_FILE_NAME) {
+string TODO_FILE_PATH;
+char* TODO_FILE_NAME = "todos.bin";
+
+todo* init_todos(int* todo_count) {
   #ifdef _WIN32
     const char* TODO_DIR_PATH = strcat(getenv("APPDATA"), "/ctodo");
   #else
