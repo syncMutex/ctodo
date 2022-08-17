@@ -180,7 +180,7 @@ void view_cur_todo_details() {
   win_clr_pad_rf(todo_details_pad);
   
   int c = -1;
-  while(c != 27 && c != 10 && c != KEY_ENTER) {
+  while(c != 27 && c != 10 && c != KEY_ENTER && c != 'o') {
     c = getch();
     switch(c) {
     case KEY_DOWN:
@@ -287,7 +287,7 @@ void _update_todo_curs(int prevtidx, bool do_paint, bool is_move_mode) {
     else
       todo_cursor.offset -= tlnc_wlnbr(curtidx);
 
-    int cur_end_offset = tline_count(curtidx) + todo_cursor.offset + main_pad.offset.y;
+    int cur_end_offset = tline_count(curtidx) + todo_cursor.offset;
 
     adjust_scr_bounds(cur_end_offset);
   }
@@ -384,7 +384,9 @@ int main() {
   int maxx = getmaxx(stdscr);
   main_pad = new_pad(-1, maxx - 1, 2, 1);
   top_bar = new_pad(1, -1, 0, 0);
-  status_bar = new_pad(1, -1, 0, 28);
+  int status_bar_offsetx = maxx / 2 - 2;
+  if(status_bar_offsetx < 26) status_bar_offsetx = 27;
+  status_bar = new_pad(1, -1, 0, status_bar_offsetx);
 
   refresh();
 
@@ -495,6 +497,7 @@ int main() {
       render_todo(todo_cursor.offset, 0, todos[cur_tidx], COLOR_PAIR(COLOR_HIGHLIGHT));
       pad_rf(main_pad);
       set_can_save(true);
+      update_status_bar();
       break;
     case 'm':
       is_move_mode = !is_move_mode;

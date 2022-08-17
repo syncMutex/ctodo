@@ -51,9 +51,9 @@ PAD new_subpad(PAD ppad, int dimeny, int dimenx, int offsety, int offsetx) {
 }
 
 int pad_rf(PAD pad) {
-  // pad.max.y - 1 [because getmaxyx gives line count and not max idx]
-  int my = pad.max.y - 1 - pad.offset.y;
-  int mx = pad.max.x - pad.offset.x;
+  // -1 [because getmaxyx gives max count and not max idx]
+  int my = pad.max.y - 1;
+  int mx = pad.max.x - 1;
   return prefresh(
     pad.pad,
     pad.cur_pos, 0,
