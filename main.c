@@ -31,7 +31,7 @@ void print_tcurs() {
 }
 
 PAD main_pad;
-PAD top_bar;
+PAD topbar;
 PAD status_bar;
 
 #define tline_count(tidx) ((todos[tidx].todo.length + 3) / main_pad.max.x + 1)
@@ -160,6 +160,8 @@ void view_cur_todo_details() {
   int dimenx = main_pad.max.x - 1 < 80 ? main_pad.max.x - 2 : 80;
   int max_cur_pos = 7 + ((t.todo.length + 6) / dimenx + 1);
 
+  if(t.is_completed) max_cur_pos += 2;
+
   PAD todo_details_pad = new_subpad(main_pad, max_cur_pos, dimenx, 1, 1);
 
   clear();
@@ -176,6 +178,9 @@ void view_cur_todo_details() {
   wattron(todo_details_pad.pad, att);
   waddstr(todo_details_pad.pad, t.is_completed ? "completed" : "pending");
   wattroff(todo_details_pad.pad, att);
+
+  if(t.is_completed)
+    wprintw(todo_details_pad.pad, "\n\ncompleted on: %s", t.completed_date);
   
   win_clr_pad_rf(todo_details_pad);
   
@@ -345,18 +350,18 @@ void test_todos() {
   free(s.val);
 }
 
-void update_top_bar(bool can_save) {
-  pad_clear(top_bar);
+void update_topbar(bool can_save) {
+  pad_clear(topbar);
   if(can_save) {
-    wattron(top_bar.pad, COLOR_PAIR(COLOR_PENDING));
-    mvwprintw(top_bar.pad, 0, 0, "you have unsaved changes");
-    wattroff(top_bar.pad, COLOR_PAIR(COLOR_PENDING));
+    wattron(topbar.pad, COLOR_PAIR(COLOR_PENDING));
+    mvwprintw(topbar.pad, 0, 0, "you have unsaved changes");
+    wattroff(topbar.pad, COLOR_PAIR(COLOR_PENDING));
   } else {
-    wattron(top_bar.pad, COLOR_PAIR(COLOR_COMPLETE));
-    mvwprintw(top_bar.pad, 0, 0, "saved changes");
-    wattroff(top_bar.pad, COLOR_PAIR(COLOR_COMPLETE));
+    wattron(topbar.pad, COLOR_PAIR(COLOR_COMPLETE));
+    mvwprintw(topbar.pad, 0, 0, "saved changes");
+    wattroff(topbar.pad, COLOR_PAIR(COLOR_COMPLETE));
   }
-  pad_rf(top_bar);
+  pad_rf(topbar);
 }
 
 void update_status_bar() {
@@ -383,7 +388,7 @@ int main() {
 
   int maxx = getmaxx(stdscr);
   main_pad = new_pad(-1, maxx - 1, 2, 1);
-  top_bar = new_pad(1, -1, 0, 0);
+  topbar = new_pad(1, -1, 0, 0);
   int status_bar_offsetx = maxx / 2 - 2;
   if(status_bar_offsetx < 26) status_bar_offsetx = 27;
   status_bar = new_pad(1, -1, 0, status_bar_offsetx);
@@ -391,6 +396,7 @@ int main() {
   refresh();
 
   todos = init_todos(&todo_count);
+  delete_old_todos(&todos, &todo_count);
 
   if(todo_count == 0) {
     waddstr(main_pad.pad, "Man make some todos...");
@@ -411,6 +417,7 @@ int main() {
   bool quit = false;
   bool is_move_mode = false;
   bool can_save = false;
+  bool can_display_topbar = false;
   int prev_c;
 
   if(todo_count != 0)
@@ -418,7 +425,7 @@ int main() {
 
   #define quit_loop() quit = true; break
 
-  #define set_can_save(to) can_save = to; update_top_bar(can_save)
+  #define set_can_save(to) can_display_topbar = true; can_save = to; update_topbar(can_save)
 
   while(!quit) {
     int c = getch();
@@ -460,13 +467,14 @@ int main() {
       can_save = modify_todo(&(todos[cur_tidx]));
       render_todos();
       update_todo_curs(no_change, true);
-      update_top_bar(can_save);
+      update_topbar(can_save);
       update_status_bar();
       break;
     case 'o':
       view_cur_todo_details();
       render_todos();
       update_todo_curs(no_change, true);
+      if(can_display_topbar) update_topbar(can_save);
       update_status_bar();
       break;
     case KEY_DOWN:
@@ -493,7 +501,7 @@ int main() {
       update_status_bar();
       break;
     case 'x':
-      todos[cur_tidx].is_completed = !(todos[cur_tidx].is_completed);
+      toggle_complete_todo(&todos[cur_tidx]);
       render_todo(todo_cursor.offset, 0, todos[cur_tidx], COLOR_PAIR(COLOR_HIGHLIGHT));
       pad_rf(main_pad);
       set_can_save(true);
@@ -554,7 +562,7 @@ int main() {
   
   delwin(main_pad.pad);
   delwin(status_bar.pad);
-  delwin(top_bar.pad);
+  delwin(topbar.pad);
   endwin();
   return 0;
 }

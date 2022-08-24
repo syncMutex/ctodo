@@ -7,6 +7,7 @@
 typedef struct {
   char created_date[11];
   char modified_date[11];
+  char completed_date[11];
   bool is_completed;
   string todo;
 } todo;
@@ -18,6 +19,8 @@ todo* create_todo(char* todo_string);
 bool add_todo(todo** todos, int *todo_count, todo* new_todo);
 bool delete_todo(todo** todos, int todo_idx, int* todo_count);
 bool edit_todo(todo* t, char* new_todo_text);
+void toggle_complete_todo(todo* t);
+void delete_old_todos(todo** todos, int* todo_count);
 void print_todo(todo t);
 
 #endif

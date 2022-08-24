@@ -11,6 +11,7 @@
 bool write_todo(todo t, FILE* f) {
   WRITE_FILE(t.created_date, char, 11, f);
   WRITE_FILE(t.modified_date, char, 11, f);
+  WRITE_FILE(t.completed_date, char, 11, f);
   WRITE_STRING(t.todo, f);
   WRITE_FILE(&(t.is_completed), bool, 1, f);
   return true;
@@ -36,6 +37,7 @@ string* read_string(FILE* f) {
 bool read_todo(todo* t, FILE* f) {
   READ_FILE(t->created_date, char, 11, f);
   READ_FILE(t->modified_date, char, 11, f);
+  READ_FILE(t->completed_date, char, 11, f);
 
   string* temps = read_string(f);
   if(temps == NULL) return false;
@@ -89,15 +91,49 @@ todo* read_todos_from_file(const char* file_name, int* todo_count) {
   return todos;
 }
 
+void get_today_date(int* dd, int* mm, int* yyyy) {
+  time_t ti = time(NULL);
+  struct tm time = *localtime(&ti);
+
+  *dd = time.tm_mday;
+  *mm = time.tm_mon + 1;
+  *yyyy = time.tm_year + 1900;
+}
+
+void get_today_date_str(char str[11]) {
+  int dd, mm, yyyy;
+  get_today_date(&dd, &mm, &yyyy);
+  sprintf(str, "%d-%d-%d", dd, mm, yyyy);
+}
+
+int date_diff(char* d1, char* d2) { 
+  int diff = 0;
+  int temp1 = 0, temp2 = 0;
+  
+  for(int i = 0; i <= 11; i++) {
+    if(i < 11 && d1[i] == '\0' || d2[i] == '\0') break;
+
+    if(d1[i] == '-' || d1[i] == '\0') {
+      diff = temp1 - temp2;
+      temp1 = 0;
+      temp2 = 0;
+      if(diff != 0) break;
+    } else {
+      temp1 = (temp1 * 10) + d1[i] - '0';
+      temp2 = (temp2 * 10) + d2[i] - '0';
+    }
+  }
+  
+  if(diff < 0) diff *= -1;
+  return diff; 
+}
+
 todo* create_todo(char* todo_string) {
   todo* newtodo = malloc(sizeof(todo));
   if(newtodo == NULL) return NULL;
 
-  time_t ti = time(NULL); 
-  struct tm time = *localtime(&ti);
   char cur_date[11];
-
-  sprintf(cur_date, "%d-%d-%d", time.tm_mday, time.tm_mon + 1, time.tm_year + 1900);
+  get_today_date_str(cur_date);
 
   strncpy(newtodo->created_date, cur_date, 10);
   strncpy(newtodo->modified_date, cur_date, 10);
@@ -144,13 +180,37 @@ bool delete_todo(todo** _todos, int todo_idx, int* todo_count) {
 
 bool edit_todo(todo* t, char* new_todo_text) {
   set_str(&(t->todo), new_todo_text);
-  time_t ti = time(NULL); 
-  struct tm time = *localtime(&ti);
-  char cur_date[11];
 
-  sprintf(cur_date, "%d-%d-%d", time.tm_mday, time.tm_mon + 1, time.tm_year + 1900);
+  char cur_date[11];
+  get_today_date_str(cur_date);
+
   strncpy(t->modified_date, cur_date, 10);
   return true;
+}
+
+void toggle_complete_todo(todo* t) {
+  t->is_completed = !(t->is_completed);
+
+  if(t->is_completed) {
+    char cur_date[11];
+    get_today_date_str(cur_date);
+    strncpy(t->completed_date, cur_date, 10);
+  } else {
+    for(int i = 0; i < 11; i++)
+      t->completed_date[i] = '\0';
+  }
+}
+
+void delete_old_todos(todo** _todos, int *todo_count) {
+  todo* todos = *_todos;
+  char cur_date[11];
+  get_today_date_str(cur_date);
+
+  for(int i = 0, tc = *todo_count; i < tc; i++) {
+    todo t = todos[i];
+    if(t.is_completed && (date_diff(cur_date, t.completed_date) > 2))
+      delete_todo(_todos, i, todo_count);
+  }
 }
 
 void print_todo(todo t) {
