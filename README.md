@@ -37,3 +37,10 @@ to run the file:
 |`k` or <kbd>&uarr;</kbd>|move cursor up|
 |`j` or <kbd>&darr;</kbd>|move cursor down|
 |`m`|toggle move mode|
+
+#### others
+
+|command|action|
+|-------|------|
+|`q`|quit|
+|<kbd>esc</kbd>|exit a window|
