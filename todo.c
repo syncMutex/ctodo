@@ -117,7 +117,10 @@ int date_diff(char* d1, char* d2) {
       diff = temp1 - temp2;
       temp1 = 0;
       temp2 = 0;
-      if(diff != 0) break;
+      if(diff != 0) {
+				if(i != 2) diff = 2;
+				break;
+			}
     } else {
       temp1 = (temp1 * 10) + d1[i] - '0';
       temp2 = (temp2 * 10) + d2[i] - '0';
